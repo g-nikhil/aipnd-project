@@ -234,7 +234,7 @@ def testing(model, criterion, device, test_dataloader):
 def save_checkpoint(in_args, model):
     checkpoint = {
                     'epoch': in_args.epochs,
-                    'pretrained_network' : in_args.arch,
+                    'arch' : in_args.arch,
                     'classifier' : model.classifier,
                     'model_state_dict': model.state_dict(),
                     'class_to_idx': model.class_to_idx,

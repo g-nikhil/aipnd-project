@@ -8,9 +8,9 @@ import argparse
 import sys
 from os import path
 
-supported_arch_list = ['vgg16', 'resnet18', 'alexnet']
 mean = [0.485, 0.456, 0.406]
 std = [0.229, 0.224, 0.225]
+
 with open('cat_to_name.json', 'r') as f:
     cat_to_name = json.load(f)
 
@@ -18,7 +18,6 @@ def get_input_args():
     # Create Parse using ArgumentParser
     parser = argparse.ArgumentParser()
     # Create command line arguments
-    parser.add_argument('--arch', dest = 'arch', type = str, default = 'vgg16', help = 'CNN Model Architecture to use', choices = supported_arch_list)
     parser.add_argument('--image_path', dest = 'image_path', type = str, default = 'flowers/test/28/image_05214.jpg', help = 'path to Sample Image')
     parser.add_argument('--save_path', dest = 'save_path', type = str, default = 'checkpoint.pth', help = 'location to save checkpoint')
     parser.add_argument('--gpu', dest='gpu', action='store_true', default=False, help = 'Is Run on GPU')
@@ -33,17 +32,15 @@ def check_input_args(in_args):
     if not path.exists(in_args.save_path):
         print('--Input Error: save_path does not exist--');
         sys.exit()
-    if in_args.arch not in supported_arch_list:
-        print('--Input Error: given arch is not supported--');
-        sys.exit()
 # check_input_args
 
-def load_checkpoint(filepath, gpu, arch):
+def load_checkpoint(filepath, gpu):
     if gpu and torch.cuda.is_available():
         map_location=lambda storage, loc: storage.cuda()
     else:
         map_location='cpu'
     checkpoint = torch.load(filepath, map_location=map_location)
+    arch = checkpoint['arch'] if 'arch' in checkpoint else 'vgg16'
     if arch == 'resnet18':
         model = models.resnet18(pretrained=True)
     elif arch == 'alexnet':
@@ -122,7 +119,7 @@ def predict( model, image_path, topk, gpu):
 def main():
     in_args = get_input_args()
     check_input_args(in_args)
-    model = load_checkpoint(in_args.save_path, in_args.gpu, in_args.arch)
+    model = load_checkpoint(in_args.save_path, in_args.gpu)
     ps, category = predict(model, in_args.image_path, in_args.topk, in_args.gpu)
     for op in zip(ps,  [cat_to_name[c] for c in category ]):
         print(op)
