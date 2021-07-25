@@ -144,13 +144,15 @@ def build_network(in_args):
     # Build Classifier Network
     classifier = nn.Sequential(model_dict)
     # replace model classifier with our own
-    model.classifier = classifier
-    
-    print(in_args.hidden_units)
-    print(model.classifier)
+    if in_args.arch == 'resnet18':
+        model.fc = classifier
+    elif in_args.arch == 'alexnet':
+        model.classifier = classifier
+    else:
+        model.classifier = classifier
 
     criterion = nn.NLLLoss()
-    optimizer = optim.Adam(model.classifier.parameters(), lr=0.001)
+    optimizer = optim.Adam(classifier.parameters(), lr=0.001)
     
     return (model, criterion, optimizer)
 # build_network
@@ -231,11 +233,17 @@ def testing(model, criterion, device, test_dataloader):
     
 # testing
 
-def save_checkpoint(in_args, model):
+def save_checkpoint(in_args, model):   
+    if in_args.arch == 'resnet18':
+        classifier = model.fc
+    elif in_args.arch == 'alexnet':
+        classifier = model.classifier
+    else:
+        classifier = model.classifier
     checkpoint = {
                     'epoch': in_args.epochs,
                     'arch' : in_args.arch,
-                    'classifier' : model.classifier,
+                    'classifier' : classifier,
                     'model_state_dict': model.state_dict(),
                     'class_to_idx': model.class_to_idx,
                  }
