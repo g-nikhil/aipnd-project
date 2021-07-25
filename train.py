@@ -36,7 +36,7 @@ def get_input_args():
     parser.add_argument('--data_dir', dest = 'data_dir', type = str, default = 'flowers', help = 'Folder with test/train/valid image folders')
     parser.add_argument('--save_path', dest = 'save_path', type = str, default = 'checkpoint.pth', help = 'location to save checkpoint')
     parser.add_argument('--dropout', dest = 'dropout', type=float, default = 0.2, help = 'Hidden Layer drop out probability')
-    parser.add_argument('--gpu', dest='gpu', type=bool, default = False, help = 'Is Run on GPU')
+    parser.add_argument('--gpu', dest='gpu', action='store_true', default = False, help = 'Is Run on GPU')
     parser.add_argument('--hidden_units', dest= 'hidden_units', type=int, nargs=2, metavar=('hu1', 'hu2'), help='comma separated list of hidden units')
     
     return parser.parse_args()

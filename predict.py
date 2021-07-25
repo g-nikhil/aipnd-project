@@ -19,9 +19,9 @@ def get_input_args():
     parser = argparse.ArgumentParser()
     # Create command line arguments
     parser.add_argument('--arch', dest = 'arch', type = str, default = 'vgg16', help = 'CNN Model Architecture to use', choices = supported_arch_list)
-    parser.add_argument('--image_path', dest = 'image_path', type = str, default = 'flowers/test/28/image_05270.jpg', help = 'path to Sample Image')
+    parser.add_argument('--image_path', dest = 'image_path', type = str, default = 'flowers/test/28/image_05214.jpg', help = 'path to Sample Image')
     parser.add_argument('--save_path', dest = 'save_path', type = str, default = 'checkpoint.pth', help = 'location to save checkpoint')
-    parser.add_argument('--gpu', dest='gpu', type=bool, default = False, help = 'Is Run on GPU')
+    parser.add_argument('--gpu', dest='gpu', action='store_true', default=False, help = 'Is Run on GPU')
     parser.add_argument('--topk', dest='topk', type=int, default = 5, help = 'Number of top categories to return')
     return parser.parse_args()
 # get_input_args
@@ -107,13 +107,16 @@ def predict( model, image_path, topk, gpu):
     device = get_device(gpu)
     model, img = model.to(device), img.to(device)
     
-    logps = model.forward(img)
+    
+    with torch.no_grad():
+        logps = model.forward(img)
     top_ps, top_idx = torch.topk(logps, topk)
-    ps = torch.exp(top_ps)
+    ps = torch.exp(top_ps).cpu()
+    top_idx = top_idx.cpu()
     idx_to_class = {model.class_to_idx[k]:k for k in model.class_to_idx}
     category = [ idx_to_class[idx] for idx in top_idx.numpy()[0]]
 
-    return ps.detach().numpy()[0], category
+    return ps.numpy()[0], category
 # predict
 
 def main():
