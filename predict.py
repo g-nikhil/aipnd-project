@@ -11,9 +11,6 @@ from os import path
 mean = [0.485, 0.456, 0.406]
 std = [0.229, 0.224, 0.225]
 
-with open('cat_to_name.json', 'r') as f:
-    cat_to_name = json.load(f)
-
 def get_input_args():
     # Create Parse using ArgumentParser
     parser = argparse.ArgumentParser()
@@ -22,6 +19,7 @@ def get_input_args():
     parser.add_argument('--save_path', dest = 'save_path', type = str, default = 'checkpoint.pth', help = 'location to save checkpoint')
     parser.add_argument('--gpu', dest='gpu', action='store_true', default=False, help = 'Is Run on GPU')
     parser.add_argument('--topk', dest='topk', type=int, default = 5, help = 'Number of top categories to return')
+    parser.add_argument('--mapping_file', dest = 'mapping_file', type = str, default = 'cat_to_name.json', help = 'Path to Json file containing category to names')
     return parser.parse_args()
 # get_input_args
 
@@ -31,6 +29,9 @@ def check_input_args(in_args):
         sys.exit()
     if not path.exists(in_args.save_path):
         print('--Input Error: save_path does not exist--');
+        sys.exit()
+    if not path.exists(in_args.mapping_file):
+        print('--Input Error: mapping_file does not exist--');
         sys.exit()
 # check_input_args
 
@@ -121,6 +122,10 @@ def main():
     check_input_args(in_args)
     model = load_checkpoint(in_args.save_path, in_args.gpu)
     ps, category = predict(model, in_args.image_path, in_args.topk, in_args.gpu)
+    
+    with open( in_args.mapping_file, 'r') as f:
+        cat_to_name = json.load(f)
+        
     for op in zip(ps,  [cat_to_name[c] for c in category ]):
         print(op)
 # main
