@@ -152,7 +152,7 @@ def build_network(in_args):
         model.classifier = classifier
 
     criterion = nn.NLLLoss()
-    optimizer = optim.Adam(classifier.parameters(), lr=0.001)
+    optimizer = optim.Adam(classifier.parameters(), lr=in_args.lr)
     
     return (model, criterion, optimizer)
 # build_network
