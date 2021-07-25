@@ -44,11 +44,13 @@ def load_checkpoint(filepath, gpu):
     arch = checkpoint['arch'] if 'arch' in checkpoint else 'vgg16'
     if arch == 'resnet18':
         model = models.resnet18(pretrained=True)
+        model.fc = checkpoint['classifier']
     elif arch == 'alexnet':
         model = models.alexnet(pretrained=True)
+        model.classifier = checkpoint['classifier']
     else:
         model = models.vgg16(pretrained=True)
-    model.classifier = checkpoint['classifier']
+        model.classifier = checkpoint['classifier']
     model.load_state_dict(checkpoint['model_state_dict'])
     model.class_to_idx = checkpoint['class_to_idx']
     return model
