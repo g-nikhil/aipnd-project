@@ -14,9 +14,6 @@ from torch.utils.data import DataLoader
 
 from collections import OrderedDict
 import json
-if torch.cuda.is_available():
-    from workspace_utils import active_session, keep_awake
-from PIL import Image
 import numpy as np
 import argparse
 import sys
@@ -37,6 +34,7 @@ def get_input_args():
     parser.add_argument('--learning_rate', dest = 'lr', type = float, default = 0.001, help = 'Learning Rate')
     parser.add_argument('--arch', dest = 'arch', type = str, default = 'vgg16', help = 'CNN Model Architecture to use', choices = supported_arch_list)
     parser.add_argument('--data_dir', dest = 'data_dir', type = str, default = 'flowers', help = 'Folder with test/train/valid image folders')
+    parser.add_argument('--save_path', dest = 'save_path', type = str, default = 'checkpoint.pth', help = 'location to save checkpoint')
     parser.add_argument('--dropout', dest = 'dropout', type=float, default = 0.2, help = 'Hidden Layer drop out probability')
     parser.add_argument('--gpu', dest='gpu', type=bool, default = False, help = 'Is Run on GPU')
     parser.add_argument('--hidden_units', dest= 'hidden_units', type=int, nargs=2, metavar=('hu1', 'hu2'), help='comma separated list of hidden units')
@@ -45,20 +43,23 @@ def get_input_args():
 # get_input_args
 
 def check_input_args(in_args):
-    if in_args.hu_divisor <= 1:
-        print('--Input Error: hidden_unit_divisor must be greater than 1--');
+    if in_args.hidden_units is None or len(in_args.hidden_units) < 1:
+        print('--Input Error: hidden_units input is missing--');
         sys.exit()
     if in_args.epochs <= 0:
         print('--Input Error: epochs must be greater than 0--');
         sys.exit()
-    if in_args.learning_rate <= 0 or in_args.learning_rate> 1:
+    if in_args.lr <= 0 or in_args.lr> 1:
         print('--Input Error: learning_rate must be between 0 and 1--');
         sys.exit()  
-    if in_args.dropout <= 0 or in_args.learning_rate> 1:
+    if in_args.dropout <= 0 or in_args.dropout> 1:
         print('--Input Error: dropout must be between 0 and 1--');
         sys.exit()
     if not path.exists(in_args.data_dir):
         print('--Input Error: data_dir doesnot exist--');
+        sys.exit()
+    if path.exists(in_args.save_path):
+        print('--Input Error: save_path already exist--');
         sys.exit()
     if in_args.arch not in supported_arch_list:
         print('--Input Error: given arch is not supported--');
@@ -127,10 +128,10 @@ def build_network(in_args):
                           ('relu0', nn.ReLU()),
                           ('dropout0', nn.Dropout(p=in_args.dropout))
                     ])   
-    for i in range(1, len(in_args.hidden_units)-1):        
-        model_dict['fc'+i] = nn.Linear(in_args.hidden_units[i], in_args.hidden_units[i+1]))
-        model_dict['relu'+i] = nn.ReLU()
-        model_dict['dropout'+i] = nn.Dropout(p=in_args.dropout)
+    for i in range(0, len(in_args.hidden_units)-1):        
+        model_dict['fc'+ str(i+1)] = nn.Linear(in_args.hidden_units[i], in_args.hidden_units[i+1])
+        model_dict['relu'+str(i+1)] = nn.ReLU()
+        model_dict['dropout'+str(i+1)] = nn.Dropout(p=in_args.dropout)
     #    
     model_dict['output'] = nn.Linear(in_args.hidden_units[-1], outputs)    
     model_dict['logsoftmax'] = nn.LogSoftmax(dim=1)
@@ -139,14 +140,116 @@ def build_network(in_args):
     classifier = nn.Sequential(model_dict)
     # replace model classifier with our own
     model.classifier = classifier
+    
+    print(in_args.hidden_units)
+    print(model.classifier)
 
     criterion = nn.NLLLoss()
-    optimizer = optim.Adam(vgg_model.classifier.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.classifier.parameters(), lr=0.001)
     
     return (model, criterion, optimizer)
 # build_network
 
+def validation(model, criterion, device, valid_dataloader):
+    validation_loss = 0
+    validation_accuracy = 0
 
+    with torch.no_grad():
+    # put metwork in training mode
+        model.eval()
+        for images, labels in valid_dataloader:
+            images, labels = images.to(device), labels.to(device)
+            logps = model.forward(images)
+            validation_loss += criterion(logps, labels).item()
+
+            ps = torch.exp(logps)
+            top_p, top_class = ps.topk(1, dim=1)
+            equals = top_class == labels.view(*top_class.shape)
+            validation_accuracy += torch.mean(equals.type(torch.FloatTensor))
+
+        # restore network to training mode
+        model.train()
+    return (validation_loss, validation_accuracy)
+# validation
+
+def training(model, criterion, optimizer, epochs, device, train_dataloader, valid_dataloader):
+    # move model to device
+    model.to(device)
+
+    for e in range(epochs):
+        training_loss = 0
+        for batch, (images, labels) in enumerate(train_dataloader):
+            # clear grad
+            optimizer.zero_grad()
+            # move images and labels to device
+            images, labels = images.to(device), labels.to(device)
+            # Feed Forward
+            logps = model.forward(images)
+            # Compute loss
+            loss = criterion(logps, labels)
+            # Backpropagate
+            loss.backward()
+            # Update weights
+            optimizer.step()
+
+            training_loss += loss.item()      
+            
+        else:
+            validation_loss, validation_accuracy = validation(model, criterion, device, valid_dataloader)
+            print(f"--------Epoch: {e+1}/{epochs}----------")
+            print(f"Training Loss: {training_loss/len(train_dataloader)}")
+            print(f"Validation Loss: {validation_loss/len(valid_dataloader)}")
+            print(f"Validation Accuracy: {validation_accuracy/len(valid_dataloader)}")
+# training
+
+def testing(model, criterion, device, test_dataloader):
+    testing_loss = 0
+    testing_accuracy = 0
+
+    with torch.no_grad():
+        # put metwork in training mode
+        model.eval()
+        for images, labels in test_dataloader:
+            images, labels = images.to(device), labels.to(device)
+            logps = model.forward(images)
+            testing_loss += criterion(logps, labels)
+
+            ps = torch.exp(logps)
+            top_p, top_class = ps.topk(1, dim=1)
+            equals = top_class == labels.view(*top_class.shape)
+            testing_accuracy += torch.mean(equals.type(torch.FloatTensor))
+
+        # restore network to training mode
+        model.train()
+        print(f"Test Loss: {testing_loss/len(test_dataloader):.3f}")
+        print(f"Test Accuracy: {testing_accuracy/len(test_dataloader):.3f}")
+    
+# testing
+
+def save_checkpoint(in_args, model):
+    checkpoint = {
+                    'epoch': in_args.epochs,
+                    'pretrained_network' : in_args.arch,
+                    'classifier' : model.classifier,
+                    'model_state_dict': model.state_dict(),
+                    'class_to_idx': model.class_to_idx,
+                 }
+
+    torch.save(checkpoint, in_args.save_path)
+# save_checkpoint
+
+def main():
+    in_args = get_input_args()
+    check_input_args(in_args)
+    model, criterion, optimizer = build_network(in_args)
+    ds, dl = get_dataloaders(in_args.data_dir)
+    # mapping of classes to indices
+    model.class_to_idx = ds[0].class_to_idx
+    device = get_device()
+    training(model, criterion, optimizer, in_args.epochs, device, dl[0], dl[1])
+    testing(model, criterion, device, dl[2] )
+    save_checkpoint(in_args, model)
+# main
 
 # Call to main function to run the program
 if __name__ == "__main__":
