@@ -104,7 +104,12 @@ def get_dataloaders(data_dir):
 # get_dataloaders
 
 def get_device(gpu = False):
-     return 'cuda' if gpu and torch.cuda.is_available() else 'cpu'
+    if gpu and torch.cuda.is_available:
+        print('*** Running on GPU ***')
+        return 'cuda'
+    else:
+        print('*** Running on CPU ***')
+        return 'cpu'
 # get_device
 
 def build_network(in_args):
@@ -245,7 +250,7 @@ def main():
     ds, dl = get_dataloaders(in_args.data_dir)
     # mapping of classes to indices
     model.class_to_idx = ds[0].class_to_idx
-    device = get_device()
+    device = get_device(in_args.gpu)
     training(model, criterion, optimizer, in_args.epochs, device, dl[0], dl[1])
     testing(model, criterion, device, dl[2] )
     save_checkpoint(in_args, model)

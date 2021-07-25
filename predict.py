@@ -88,7 +88,16 @@ def process_image(image):
     return color_normalized_img
 # process_image
 
-def predict(image_path, model, topk=5):
+def get_device(gpu = False):
+    if gpu and torch.cuda.is_available:
+        print('*** Running on GPU ***')
+        return 'cuda'
+    else:
+        print('*** Running on CPU ***')
+        return 'cpu'
+# get_device
+
+def predict(image_path, model, topk=5, gpu):
     ''' Predict the class (or classes) of an image using a trained deep learning model.
     '''
     
@@ -98,7 +107,7 @@ def predict(image_path, model, topk=5):
     img = torch.FloatTensor(np_img).unsqueeze(0)
     
     model.eval()
-    device = 'cpu'
+    device = get_device(gpu)
     model.to(device)
     img.to(device)
     
@@ -115,7 +124,7 @@ def main():
     in_args = get_input_args()
     check_input_args(in_args)
     model = load_checkpoint(in_args.save_path, in_args.gpu, in_args.arch)
-    ps, category = predict(in_args.image_path, model)
+    ps, category = predict(in_args.image_path, model, in_args.gpu)
     for op in zip(ps,  [cat_to_name[c] for c in category ]):
         print(op)
 # main
