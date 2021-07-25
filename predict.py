@@ -1,12 +1,9 @@
 import torch
 from torchvision import models
-from torch.utils.data import DataLoader
 
-from collections import OrderedDict
 import json
 from PIL import Image
 import numpy as np
-import matplotlib.pyplot as plt
 import argparse
 import sys
 from os import path
@@ -97,7 +94,7 @@ def get_device(gpu = False):
         return 'cpu'
 # get_device
 
-def predict(image_path, model, topk=5, gpu):
+def predict( model, image_path, topk, gpu):
     ''' Predict the class (or classes) of an image using a trained deep learning model.
     '''
     
@@ -108,8 +105,7 @@ def predict(image_path, model, topk=5, gpu):
     
     model.eval()
     device = get_device(gpu)
-    model.to(device)
-    img.to(device)
+    model, img = model.to(device), img.to(device)
     
     logps = model.forward(img)
     top_ps, top_idx = torch.topk(logps, topk)
@@ -124,7 +120,7 @@ def main():
     in_args = get_input_args()
     check_input_args(in_args)
     model = load_checkpoint(in_args.save_path, in_args.gpu, in_args.arch)
-    ps, category = predict(in_args.image_path, model, in_args.gpu)
+    ps, category = predict(model, in_args.image_path, in_args.topk, in_args.gpu)
     for op in zip(ps,  [cat_to_name[c] for c in category ]):
         print(op)
 # main
