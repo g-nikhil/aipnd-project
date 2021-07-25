@@ -22,10 +22,7 @@ from os import path
 supported_arch_list = ['vgg16', 'resnet18', 'alexnet']
 mean = [0.485, 0.456, 0.406]
 std = [0.229, 0.224, 0.225]
-with open('cat_to_name.json', 'r') as f:
-    cat_to_name = json.load(f)
-outputs = len(cat_to_name)
-
+    
 def get_input_args():
     # Create Parse using ArgumentParser
     parser = argparse.ArgumentParser()
@@ -38,7 +35,6 @@ def get_input_args():
     parser.add_argument('--dropout', dest = 'dropout', type=float, default = 0.2, help = 'Hidden Layer drop out probability')
     parser.add_argument('--gpu', dest='gpu', action='store_true', default = False, help = 'Is Run on GPU')
     parser.add_argument('--hidden_units', dest= 'hidden_units', type=int, nargs=2, metavar=('hu1', 'hu2'), help='comma separated list of hidden units')
-    
     return parser.parse_args()
 # get_input_args
 
@@ -112,8 +108,7 @@ def get_device(gpu = False):
         return 'cpu'
 # get_device
 
-def build_network(in_args):
-    
+def build_network(in_args, class_to_idx):    
     if in_args.arch == 'resnet18':
         model = models.resnet18(pretrained=True)
         inputs = model.fc.in_features
@@ -123,6 +118,10 @@ def build_network(in_args):
     else:
         model = models.vgg16(pretrained=True)
         inputs = model.classifier[0].in_features
+    
+    # mapping of classes to indices
+    model.class_to_idx = class_to_idx
+    outputs = len(class_to_idx)
     
     # Freeze parameters so we don't backprop through them
     for param in model.parameters():
@@ -254,10 +253,8 @@ def save_checkpoint(in_args, model):
 def main():
     in_args = get_input_args()
     check_input_args(in_args)
-    model, criterion, optimizer = build_network(in_args)
     ds, dl = get_dataloaders(in_args.data_dir)
-    # mapping of classes to indices
-    model.class_to_idx = ds[0].class_to_idx
+    model, criterion, optimizer = build_network(in_args, class_to_idx)
     device = get_device(in_args.gpu)
     training(model, criterion, optimizer, in_args.epochs, device, dl[0], dl[1])
     testing(model, criterion, device, dl[2] )
